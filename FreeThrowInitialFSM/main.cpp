@@ -97,8 +97,8 @@ int main() {
     sendProcessedData();
 
     // Wait for two minutes before trying to go back into the init sequence
-    // again
-    wait(120);
+    // again in order for the ML on the python side to complete
+    Thread::wait(120000);
     foundInitSequence = false;
   }
 
@@ -144,13 +144,13 @@ void processRawData(void) {
           accel2sign = 0, accel3sign = 0;
 
   for (int i = 0; i < 40; i++) {
-    gyro1 = gyroData[i * 10][0];
-    gyro2 = gyroData[i * 10][1];
-    gyro3 = gyroData[i * 10][2];
+    gyro1 = gyroData[i * 10][0] * 100;
+    gyro2 = gyroData[i * 10][1] * 100;
+    gyro3 = gyroData[i * 10][2] * 100;
 
-    accel1 = accelData[i * 10][0];
-    accel2 = accelData[i * 10][1];
-    accel3 = accelData[i * 10][2];
+    accel1 = accelData[i * 10][0] * 100;
+    accel2 = accelData[i * 10][1] * 100;
+    accel3 = accelData[i * 10][2] * 100;
 
     gyro1sign = gyro1 > 0 ? 0 : 1;
     gyro2sign = gyro2 > 0 ? 0 : 1;
@@ -183,7 +183,6 @@ void processRawData(void) {
 
 // This sends the data over to the Raspberry Pi
 void sendProcessedData(void) {
-
   uint8_t message[19];
   for (int i = 0; i < 40; i++) {
     message[0] = 0;
@@ -192,7 +191,7 @@ void sendProcessedData(void) {
       message[10 + j] = processedAccelData[i][j];
     }
     kw40z_device.sendAlert(message, 19);
-    wait(0.2);
+    Thread::wait(50);
   }
 }
 
