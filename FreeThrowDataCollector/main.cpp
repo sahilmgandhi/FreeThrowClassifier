@@ -62,7 +62,7 @@ volatile float z_theta = 0;
 // data[0][] = accel
 // data[1][] = velocity
 // data[2][] = position 
-const int DATA_SIZE = 1000;
+const int DATA_SIZE = 500;
 volatile float x_data[3][DATA_SIZE];
 volatile float y_data[3][DATA_SIZE];
 volatile float z_data[3][DATA_SIZE];
@@ -162,15 +162,26 @@ void updateValues(float dt) {
 }
 
 void printValues() {
-    pc.printf("***Data Dump***\n");
-    for (int i = 0; i < data_index; i++) {
-        pc.printf("x_acc,%.3f,%.3f,%.3f,\t", x_data[0][i], x_data[1][i], x_data[2][i]);
-        pc.printf("y_acc,%.3f,%.3f,%.3f,\t", y_data[0][i], y_data[1][i], y_data[2][i]);
-        pc.printf("z_acc,%.3f,%.3f,%.3f,\t", z_data[0][i], z_data[1][i], z_data[2][i]);
-        
-        pc.printf("x_ang,%.3f,%.3f,\t", x_angle[0][i], x_angle[1][i]);
-        pc.printf("y_ang,%.3f,%.3f,\t", y_angle[0][i], y_angle[1][i]);
-        pc.printf("z_ang,%.3f,%.3f,\n", z_angle[0][i], z_angle[1][i]);
+    pc.printf("***Data Dump***\ntime,x_accel,y_accel,z_accel,x_velo,y_velo,z_velo,x_pos,y_pos,z_pos,x_omega,y_omega,z_omega,x_angle,y_angle,z_angle\n");
+    for (int i = 0; i < data_index; i+=4) {
+        pc.printf(
+        "%0.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n%0.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n%0.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n%0.2f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+            (i+1)*0.01,x_data[0][i],y_data[0][i],z_data[0][i],x_data[1][i],y_data[1][i],z_data[1][i],
+            x_data[2][i],y_data[2][i],z_data[2][i],x_angle[0][i],y_angle[0][i],z_angle[0][i],
+            x_angle[1][i],y_angle[1][i],z_angle[1][i],
+            
+            (i+1+1)*0.01,x_data[0][i+1],y_data[0][i+1],z_data[0][i+1],x_data[1][i+1],y_data[1][i+1],z_data[1][i+1],
+            x_data[2][i+1],y_data[2][i+1],z_data[2][i+1],x_angle[0][i+1],y_angle[0][i+1],z_angle[0][i+1],
+            x_angle[1][i+1],y_angle[1][i+1],z_angle[1][i+1],
+            
+            (i+2+1)*0.01,x_data[0][i+2],y_data[0][i+2],z_data[0][i+2],x_data[1][i+2],y_data[1][i+2],z_data[1][i+2],
+            x_data[2][i+2],y_data[2][i+2],z_data[2][i+2],x_angle[0][i+2],y_angle[0][i+2],z_angle[0][i+2],
+            x_angle[1][i+2],y_angle[1][i+2],z_angle[1][i+2],
+            
+            (i+3+1)*0.01,x_data[0][i+3],y_data[0][i+3],z_data[0][i+3],x_data[1][i+3],y_data[1][i+3],z_data[1][i+3],
+            x_data[2][i+3],y_data[2][i+3],z_data[2][i+3],x_angle[0][i+3],y_angle[0][i+3],z_angle[0][i+3],
+            x_angle[1][i+3],y_angle[1][i+3],z_angle[1][i+3]
+        );
     }
 }
 
