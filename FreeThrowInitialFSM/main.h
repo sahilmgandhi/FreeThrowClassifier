@@ -40,9 +40,7 @@ void sendProcessedData(void);
 
 Serial pc(USBTX, USBRX);
 
-DigitalOut redLed(LED1, 1);
-DigitalOut greenLed(LED2, 1);
-DigitalOut blueLed(LED3, 1);
+DigitalOut blueLed(LED3);
 DigitalOut haptic(PTB9);
 
 /* Text Buffer */
@@ -53,4 +51,17 @@ float accelData[400][3];
 uint8_t processedGyroData[40][9];
 uint8_t processedAccelData[40][9];
 
+volatile bool connectedToPi = false;
+volatile bool startGrabbingData = false;
 bool foundInitSequence = false;
+
+// Auxiliary Haptic Functions
+void StartHaptic(void) {
+  hapticTimer.start(50);
+  haptic = 1;
+}
+
+void StopHaptic(void const *n) {
+  haptic = 0;
+  hapticTimer.stop();
+}

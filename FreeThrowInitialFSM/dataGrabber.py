@@ -2,15 +2,29 @@ from bluepy import btle
 from bluepy.btle import Scanner, DefaultDelegate, ScanEntry, Peripheral
 import struct
 import time
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error, r2_score
+
+# Global Variables
+numSamplesReceived = 0
+elbowAccelerationX = []
+elbowAccelerationY = []
+elbowAccelerationZ = []
+elbowVelocityX = []
+elbowVelocityY = []
+elbowVelocityZ = []
+timeArr = []
+foundInitSequence = False
+
+# Hexiwear Addresses
+elbow_hexi_addr = '00:35:40:08:00:48'
+wrist_hexi_addr = ''
+shoulder_hexi_addr = ''
 
 # This is a delegate for receiving BTLE events
 
 
-class BTEventHandler(DefaultDelegate):
+class ElbowBTEventHandler(DefaultDelegate):
     def __init__(self):
         DefaultDelegate.__init__(self)
 
@@ -24,24 +38,26 @@ class BTEventHandler(DefaultDelegate):
             print("Received more data", dev.addr, dev.getScanData())
 
     def handleNotification(self, cHandle, data):
-        # Only print the value when the handle is 40 (the battery characteristic)
-        # if cHandle == 40:
-        #     print(data)
-        #     print(struct.unpack('B', data))
+
+        global elbowAccelerationX
+        global elbowAccelerationY
+        global elbowAccelerationZ
+        global elbowVelocityX
+        global elbowVelocityY
+        global elbowVelocityZ
+        global timeArr
         global numSamplesReceived
-        global accelerationX
-        global accelerationY
-        global accelerationZ
-        global velocityX
-        global velocityY
-        global velocityZ
 
         # Format of the data will be as follows:
         # a[0] => 0 means we are reading acceleration/velocity, 1 means angular velocity/angle
         # 1, 4, 7, 10, 13, 16 are sign bits
         # 2, 5, 8, 11, 14, 17 are the bits 8-15
         # 3, 6, 9, 12, 15, 18 are the bits 0-7
+
+        # Each iteration of this loop (all the appending) takes 0.006 seconds at max.
+        # Thus that is what we should be using between sending the BLE signals at minimum!
         if cHandle == 101:
+            # time1 = time.clock()
             numSamplesReceived += 1
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
@@ -54,76 +70,78 @@ class BTEventHandler(DefaultDelegate):
             val6 = (recVals[17] << 8) | recVals[18]
             # Reading Accel/velocity
             if recVals[0] == 0:
-                accelerationX.append(
+                elbowAccelerationX.append(
                     val1 if recVals[1]*val1 == 0 else (-1 * val1))
-                accelerationY.append(
+                elbowAccelerationY.append(
                     val2 if recVals[4]*val2 == 0 else (-1 * val2))
-                accelerationZ.append(
+                elbowAccelerationZ.append(
                     val3 if recVals[7]*val3 == 0 else (-1 * val3))
 
-                velocityX.append(
+                elbowVelocityX.append(
                     val4 if recVals[10]*val4 == 0 else (-1 * val4))
-                velocityY.append(
+                elbowVelocityY.append(
                     val5 if recVals[13]*val5 == 0 else (-1 * val5))
-                velocityZ.append(
+                elbowVelocityZ.append(
                     val6 if recVals[16]*val6 == 0 else (-1 * val6))
+            # timeArr.append(time.clock() - time1)
+
+            # This means that the wrist has gotten the start motion signal and we should now send the
+            if recVals[0] == 3:
+                foundInitSequence = true
 
 
-handler = BTEventHandler()
-
+print("Adding the handler")
+elbow_handler = ElbowBTEventHandler()
+print("Creating a scanner.")
 # Create a scanner with the handler as delegate
-scanner = Scanner().withDelegate(handler)
-
+scanner = Scanner().withDelegate(elbow_handler)
 # Start scanning. While scanning, handleDiscovery will be called whenever a new device or new data is found
 devs = scanner.scan(10)
-
 # Get HEXIWEAR's address
-hexi_addr = [dev for dev in devs if dev.getValueText(
-    0x8) == 'HEXIWEAR'][0].addr
-
 # Create a Peripheral object with the delegate
-hexi = Peripheral().withDelegate(handler)
+elbow_hexi = Peripheral().withDelegate(elbow_handler)
 
+print("Trying to connect")
 # Connect to Hexiwear
-hexi.connect(hexi_addr)
+elbow_hexi.connect(elbow_hexi_addr)
 
+print("Connected to device!")
 # # Get the battery service
-battery = hexi.getCharacteristics(uuid="2a19")[0]
+battery = elbow_hexi.getCharacteristics(uuid="2a19")[0]
 
 # Get the client configuration descriptor and write 1 to it to enable notification
 battery_desc = battery.getDescriptors(forUUID=0x2902)[0]
 battery_desc.write(b"\x01", True)
 
-alerts = hexi.getCharacteristics(uuid="2032")[0]
+alerts = elbow_hexi.getCharacteristics(uuid="2032")[0]
 alerts_desc = alerts.getDescriptors(forUUID=0x2902)[0]
 alerts_desc.write(b"\x01", True)
 
-
-numSamplesReceived = 0
-accelerationX = []
-accelerationY = []
-accelerationZ = []
-velocityX = []
-velocityY = []
-velocityZ = []
+connectCommand = '11111111111111111111'
+collectCommand = '22222222222222222222'
+# After all of the hexi's have been connected, then we should send this this:
+alertConnection = elbow_hexi.getCharacteristics(uuid="2031")[0]
+alertConnection.write(connectCommand, True)
 
 # Infinite loop to receive notifications
 while True:
-    hexi.waitForNotifications(5.0)
+    elbow_hexi.waitForNotifications(5.0)
 
+    if foundInitSequence:
+        # Repeat this for all three Hexiwears
+        alertConnection.write(collectCommand, True)
     if numSamplesReceived >= 40:
         # Do some computation with the samples that are received
         print("Got 40 samples")
-
         # Convert to the full range -> so divide by 100 for all the terms:
         for i in range(0, 40):
-            accelerationX[i] = float(accelerationX[i])/100.0
-            accelerationY[i] = float(accelerationY[i])/100.0
-            accelerationY[i] = float(accelerationY[i])/100.0
-            velocityX[i] = float(velocityX[i])/100.0
-            velocityY[i] = float(velocityY[i])/100.0
-            velocityZ[i] = float(velocityZ[i])/100.0
+            elbowAccelerationX[i] = float(elbowAccelerationX[i])/100.0
+            elbowAccelerationY[i] = float(elbowAccelerationY[i])/100.0
+            elbowAccelerationZ[i] = float(elbowAccelerationZ[i])/100.0
+            elbowVelocityX[i] = float(elbowVelocityX[i])/100.0
+            elbowVelocityY[i] = float(elbowVelocityY[i])/100.0
+            elbowVelocityZ[i] = float(elbowVelocityZ[i])/100.0
 
         # Use some pre loaded machine learning model here to train and clasify the models!
         numSamplesReceived = 0
-        time.sleep(5)
+        time.sleep(10)

@@ -29,11 +29,13 @@ FXOS8700 accel(PTC11, PTC10);
 void ButtonRight(void) {
   StartHaptic();
   kw40z_device.ToggleAdvertisementMode();
+  blueLed = !blueLed;
 }
 
 void ButtonLeft(void) {
   StartHaptic();
   kw40z_device.ToggleAdvertisementMode();
+  blueLed = !blueLed;
 }
 
 void PassKey(void) {
@@ -45,6 +47,26 @@ void PassKey(void) {
   sprintf(text, "%d", kw40z_device.GetPassKey());
   oled.TextBox((uint8_t *)text, 0, 40, 95, 18);
 }
+
+void AlertReceived(uint8_t *data, uint8_t length) {
+  StartHaptic();
+  data[19] = 0;
+  // pc.printf("%s\n\r", data);
+
+  // data (our command) must 20 bytes long.
+  // CMD for turning on: '11111111111111111111'
+  if (data[4] == '1') {
+    connectedToPi = true;
+    // greenLed = LED_ON;
+    //        redLed = LED_ON;
+
+    // CMD for turning off: 'ledoffledoffledoffled'
+  } else if (data[4] == 'f') {
+    // greenLed = LED_OFF;
+    //        redLed = LED_OFF;
+    blueLed = LED_OFF;
+  }
+}
 /***********************End of Call Back Functions*****************************/
 
 /********************************Main******************************************/
@@ -54,12 +76,14 @@ int main() {
   kw40z_device.attach_buttonLeft(&ButtonLeft);
   kw40z_device.attach_buttonRight(&ButtonRight);
   kw40z_device.attach_passkey(&PassKey);
+  kw40z_device.attach_alert(&AlertReceived);
 
   /* Turn on the backlight of the OLED Display */
   oled.DimScreenON();
 
   /* Fills the screen with solid black */
   oled.FillScreen(COLOR_BLACK);
+  blueLed = 1;
 
   /* Get OLED Class Default Text Properties */
   oled_text_properties_t textProperties = {0};
@@ -86,11 +110,18 @@ int main() {
   uint8_t currLinkState = 0;
 
   while (1) {
+    while (!connectedToPi) {
+      // Busy wait here until the PI has connected to the Hexi!
+      Thread::wait(50);
+    }
     while (!foundInitSequence) {
       // Some code here to find initial sequence to start the action:
 
       // After finding the initial sequence, we want to break out of the loop
       foundInitSequence = true;
+
+      // We also want to send an alert to the Hexi (ONLY FOR THE WRIST ONE) that
+      // we have found the sequence
     }
     collectRawData();
     processRawData();
@@ -159,25 +190,32 @@ void processRawData(void) {
     accel2sign = accel2 > 0 ? 0 : 1;
     accel3sign = accel3 > 0 ? 0 : 1;
 
-    processedGyroData[i][0] = gyro1sign;
-    processedGyroData[i][1] = (gyro1 >> 8);
-    processedGyroData[i][2] = (gyro1 & 0xff);
-    processedGyroData[i][3] = gyro2sign;
-    processedGyroData[i][4] = (gyro2 >> 8);
-    processedGyroData[i][5] = (gyro2 & 0xff);
-    processedGyroData[i][6] = gyro3sign;
-    processedGyroData[i][7] = (gyro3 >> 8);
-    processedGyroData[i][8] = (gyro3 & 0xff);
+    gyro1 = abs(gyro1);
+    gyro2 = abs(gyro2);
+    gyro3 = abs(gyro3);
+    accel1 = abs(accel1);
+    accel2 = abs(accel2);
+    accel3 = abs(accel3);
 
-    processedAccelData[i][0] = accel1sign;
-    processedAccelData[i][1] = (accel1 >> 8);
-    processedAccelData[i][2] = (accel1 & 0xff);
-    processedAccelData[i][3] = accel2sign;
-    processedAccelData[i][4] = (accel2 >> 8);
-    processedAccelData[i][5] = (accel2 & 0xff);
-    processedAccelData[i][6] = accel3sign;
-    processedAccelData[i][7] = (accel3 >> 8);
-    processedAccelData[i][8] = (accel3 & 0xff);
+    processedGyroData[i][0] = (uint8_t)gyro1sign;
+    processedGyroData[i][1] = (uint8_t)(gyro1 >> 8);
+    processedGyroData[i][2] = (uint8_t)(gyro1 & 0xff);
+    processedGyroData[i][3] = (uint8_t)gyro2sign;
+    processedGyroData[i][4] = (uint8_t)(gyro2 >> 8);
+    processedGyroData[i][5] = (uint8_t)(gyro2 & 0xff);
+    processedGyroData[i][6] = (uint8_t)gyro3sign;
+    processedGyroData[i][7] = (uint8_t)(gyro3 >> 8);
+    processedGyroData[i][8] = (uint8_t)(gyro3 & 0xff);
+
+    processedAccelData[i][0] = (uint8_t)accel1sign;
+    processedAccelData[i][1] = (uint8_t)(accel1 >> 8);
+    processedAccelData[i][2] = (uint8_t)(accel1 & 0xff);
+    processedAccelData[i][3] = (uint8_t)accel2sign;
+    processedAccelData[i][4] = (uint8_t)(accel2 >> 8);
+    processedAccelData[i][5] = (uint8_t)(accel2 & 0xff);
+    processedAccelData[i][6] = (uint8_t)accel3sign;
+    processedAccelData[i][7] = (uint8_t)(accel3 >> 8);
+    processedAccelData[i][8] = (uint8_t)(accel3 & 0xff);
   }
 }
 
@@ -242,14 +280,4 @@ void UpdateSensorData(void) {
   x += 1400;
   y -= 2300;
   z += 1700;
-}
-
-void StartHaptic(void) {
-  hapticTimer.start(50);
-  haptic = 1;
-}
-
-void StopHaptic(void const *n) {
-  haptic = 0;
-  hapticTimer.stop();
 }
