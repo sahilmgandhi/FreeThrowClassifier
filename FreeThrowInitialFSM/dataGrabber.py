@@ -47,6 +47,7 @@ class ElbowBTEventHandler(DefaultDelegate):
         global elbowVelocityZ
         global timeArr
         global numSamplesReceived
+        global foundInitSequence
 
         # Format of the data will be as follows:
         # a[0] => 0 means we are reading acceleration/velocity, 1 means angular velocity/angle
@@ -87,7 +88,7 @@ class ElbowBTEventHandler(DefaultDelegate):
 
             # This means that the wrist has gotten the start motion signal and we should now send the
             if recVals[0] == 3:
-                foundInitSequence = true
+                foundInitSequence = True
 
 
 print("Adding the handler")
