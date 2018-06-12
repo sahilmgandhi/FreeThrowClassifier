@@ -1,4 +1,5 @@
 from bluepy import btle
+import bluepy.btle
 from bluepy.btle import Scanner, DefaultDelegate, ScanEntry, Peripheral
 import struct
 import time
@@ -20,6 +21,19 @@ foundInitSequence = False
 elbow_hexi_addr = '00:35:40:08:00:48'
 wrist_hexi_addr = ''
 shoulder_hexi_addr = ''
+
+
+def try_until_success(func, exception=bluepy.btle.BTLEException, msg='reattempting', args=[]):
+    retry = True
+    while True:
+        try:
+            func(*args)
+            retry = False
+        except exception:
+            print msg
+
+        if not retry:
+            break
 
 # This is a delegate for receiving BTLE events
 
@@ -104,7 +118,9 @@ elbow_hexi = Peripheral().withDelegate(elbow_handler)
 
 print("Trying to connect")
 # Connect to Hexiwear
-elbow_hexi.connect(elbow_hexi_addr)
+# elbow_hexi.connect(elbow_hexi_addr)
+try_until_success(elbow_hexi.connect, msg='error connecting to 1',
+                  args=[elbow_hexi_addr])
 
 print("Connected to device!")
 # # Get the battery service
@@ -122,7 +138,9 @@ connectCommand = '11111111111111111111'
 collectCommand = '22222222222222222222'
 # After all of the hexi's have been connected, then we should send this this:
 alertConnection = elbow_hexi.getCharacteristics(uuid="2031")[0]
-alertConnection.write(connectCommand, True)
+# alertConnection.write(connectCommand, True)
+try_until_success(alertConnection.write, msg='Error sending connection command',
+                  args=[connectCommand, True])
 
 # Infinite loop to receive notifications
 while True:
@@ -130,7 +148,9 @@ while True:
 
     if foundInitSequence:
         # Repeat this for all three Hexiwears
-        alertConnection.write(collectCommand, True)
+        # alertConnection.write(collectCommand, True)
+        try_until_success(alertConnection.write, msg='Error sending connection command',
+                          args=[collectCommand, True])
     if numSamplesReceived >= 40:
         # Do some computation with the samples that are received
         print("Got 40 samples")
