@@ -65,6 +65,9 @@ Thread txThread;
 FXAS21002 gyro(PTC11, PTC10);
 FXOS8700 accel(PTC11, PTC10);
 
+/* Timer for initial motion */
+Timer initTimer;
+
 /* Systick ticker for data collection */
 Ticker systick;
 
@@ -211,15 +214,32 @@ int main()
             // Busy wait here until the PI has connected to the Hexi!
             Thread::wait(50);
         }
+        float temp_gyro[3];
         while (!foundInitSequence) {
             // Some code here to find initial sequence to start the action:
-
-            // After finding the initial sequence, we want to break out of the loop
-            foundInitSequence = true;
-
-            // We also want to send an alert to the Hexi (ONLY FOR THE WRIST ONE) that
-            // we have found the sequence
+            
+            // read accelerometer z-axis
+            gyro.acquire_gyro_data_dps(temp_gyro);
+            
+            // check if Hexiwear is upside down
+            if (temp_gyro[2] > 9.0f) {
+                initTimer.start();
+                do {
+                    gyro.acquire_gyro_data_dps(temp_gyro);
+                    
+                    // After finding the initial sequence, we want to break out of the loop
+                    if (initTimer.read() > 3) {
+                        foundInitSequence = true;
+                        startHaptic();
+                        break;
+                    }
+                } while(temp_gyro[2] > 9.0f);
+                initTimer.stop();
+                initTimer.reset();
+            }
         }
+        
+        // Send alert to the Pi indicating we found the sequence (WRIST ONLY)
         
         // wait for message for the Pi
         while (!startCollection) {
