@@ -14,7 +14,7 @@
 #define SYSTICK_PERIOD .01
 
 void UpdateSensorData(void);
-void StartHaptic(void);
+//void StartHaptic(void);
 void StopHaptic(void const *n);
 void txTask(void);
 
@@ -22,6 +22,13 @@ void txTask(void);
 void ButtonRight(void);
 void ButtonLeft(void);
 void PassKey(void);
+
+
+// This runs in systick to collect data, integrate to get angle, and save the values
+void updateValues();
+
+// This resets the global variables and data index used in data collection
+void resetValues();
 
 /*
  * This function collects the raw data samples and places them into the
@@ -47,6 +54,7 @@ void sendProcessedData(void);
 Serial pc(USBTX, USBRX);
 
 DigitalOut blueLed(LED3);
+DigitalOut greenLed(LED2, LED_OFF);
 DigitalOut haptic(PTB9);
 
 /* Define timer for haptic feedback */
@@ -171,10 +179,13 @@ void AlertReceived(uint8_t *data, uint8_t length)
 }
 /***********************End of Call Back Functions*****************************/
 
+
 /********************************Main******************************************/
 
 int main()
 {
+    pc.printf("This program has started\n");
+    
     /* Register callbacks to application functions */
     kw40z_device.attach_buttonLeft(&ButtonLeft);
     kw40z_device.attach_buttonRight(&ButtonRight);
@@ -208,46 +219,67 @@ int main()
     /* Display Label at x=22,y=80 */
     strcpy((char *)text, "Tap Below");
     oled.Label((uint8_t *)text, 22, 80);
-
+        
+    gyro.gyro_config();
+    accel.accel_config();    
+        
     while (1) {
-        while (!connectedToPi) {
-            // Busy wait here until the PI has connected to the Hexi!
-            Thread::wait(50);
-        }
-        float temp_gyro[3];
+        //while (!connectedToPi) {
+//            // Busy wait here until the PI has connected to the Hexi!
+//            Thread::wait(50);
+//        }
+
+        pc.printf("into main while loop\n");
         while (!foundInitSequence) {
             // Some code here to find initial sequence to start the action:
+            float temp_data[3];
+            accel.acquire_accel_data_g(temp_data);
             
-            // read accelerometer z-axis
-            gyro.acquire_gyro_data_dps(temp_gyro);
-            
-            // check if Hexiwear is upside down
-            if (temp_gyro[2] > 9.0f) {
+            // check if positive acceleration in z direction (upside down)        
+            if (temp_data[2]*9.8f > 9.0f) {
+                greenLed = LED_ON;
                 initTimer.start();
-                do {
-                    gyro.acquire_gyro_data_dps(temp_gyro);
+                
+                // continue checking after first detection
+                while (temp_data[2]*9.8f > 9.0f) {
+                    accel.acquire_accel_data_g(temp_data);
                     
-                    // After finding the initial sequence, we want to break out of the loop
-                    if (initTimer.read() > 3) {
+                    // if upside down for ~3 seconds, initial motion detected
+                    if (initTimer.read() >= 2) {
                         foundInitSequence = true;
-                        startHaptic();
+                        StartHaptic();
                         break;
                     }
-                } while(temp_gyro[2] > 9.0f);
+                }
                 initTimer.stop();
                 initTimer.reset();
             }
+            greenLed = LED_OFF;
         }
+        
+        pc.printf("Found init sequence\n");
         
         // Send alert to the Pi indicating we found the sequence (WRIST ONLY)
         
         // wait for message for the Pi
+        startCollection = true;
         while (!startCollection) {
             Thread::wait(50);
         }
         startCollection = false;
         
+        Thread::wait(1000);
+        
+        pc.printf("Begin collecting data\n");
         collectRawData();
+        pc.printf("Finished collecting data\n");
+
+        for (int i = 0; i < DATA_SIZE; i++) {
+            pc.printf("%.3f, %.3f, %.3f,%.3f, %.3f, %.3f\n", 
+            accelData[i][0], accelData[i][1],accelData[i][2], 
+            gyroData[i][0], gyroData[i][1], gyroData[i][2]);
+        }
+
         processRawData();
         sendProcessedData();
 
@@ -270,14 +302,15 @@ int main()
 
 /****************************** Data Processing Functions *******************/
 
+
 void updateValues()
-{
-    // stop arrays are full
-    if (data_index == DATA_SIZE) {
+{   
+    // stop if arrays are full
+    if (data_index >= DATA_SIZE) {
         doneCollecting = true;
         return;
     }
-    
+
     float dt = SYSTICK_PERIOD;
     float gyro_data[3];
     float accel_data[3];
@@ -319,7 +352,7 @@ void updateValues()
     x_theta += x_omega * dt;
     y_theta += y_omega * dt;
     z_theta += z_omega * dt;
-
+    
     // store acceleration data
     accelData[data_index][0] = x_accel;
     accelData[data_index][1] = y_accel;
