@@ -161,7 +161,7 @@ void AlertReceived(uint8_t *data, uint8_t length)
 {
     StartHaptic();
     data[19] = 0;
-    // pc.printf("%s\n\r", data);
+    pc.printf("%s\n\r", data);
 
     // data (our command) must 20 bytes long.
     // CMD for turning on: '11111111111111111111'
@@ -224,12 +224,19 @@ int main()
     accel.accel_config();    
         
     while (1) {
-        //while (!connectedToPi) {
-//            // Busy wait here until the PI has connected to the Hexi!
-//            Thread::wait(50);
-//        }
+        while (!connectedToPi) {
+            // Busy wait here until the PI has connected to the Hexi!
+            Thread::wait(50);
+        }
+        
+        oled.FillScreen(COLOR_BLACK);
+        strcpy((char *)text, "Flip Wrist");
+        oled.Label((uint8_t *)text, 22, 20);
+        
+        strcpy((char *)text, " To Start ");
+        oled.Label((uint8_t *)text, 22, 40);
 
-        pc.printf("into main while loop\n");
+        pc.printf("Waiting for init sequence\n");
         while (!foundInitSequence) {
             // Some code here to find initial sequence to start the action:
             float temp_data[3];
@@ -259,30 +266,50 @@ int main()
         
         pc.printf("Found init sequence\n");
         
+        oled.FillScreen(COLOR_BLACK);
+        
         // Send alert to the Pi indicating we found the sequence (WRIST ONLY)
+        uint8_t message[1] = {3};
+        kw40z_device.SendAlert(message, 1);
         
         // wait for message for the Pi
-        startCollection = true;
         while (!startCollection) {
             Thread::wait(50);
         }
         startCollection = false;
         
-        Thread::wait(1000);
+        Thread::wait(2000);
         
+        // Tell user to begin
+        StartHaptic();
+        greenLed = LED_ON;
+        strcpy((char *)text, "Begin Shot");
+        oled.Label((uint8_t *)text, 22, 40);
         pc.printf("Begin collecting data\n");
+        
         collectRawData();
+        
+        // Indicate completion
+        StartHaptic();
+        greenLed = LED_OFF;
         pc.printf("Finished collecting data\n");
+        strcpy((char *)text, "Shot Done ");
+        oled.Label((uint8_t *)text, 22, 40);
 
-        for (int i = 0; i < DATA_SIZE; i++) {
-            pc.printf("%.3f, %.3f, %.3f,%.3f, %.3f, %.3f\n", 
-            accelData[i][0], accelData[i][1],accelData[i][2], 
-            gyroData[i][0], gyroData[i][1], gyroData[i][2]);
-        }
+//        for (int i = 0; i < DATA_SIZE; i++) {
+//            pc.printf("%.3f, %.3f, %.3f,%.3f, %.3f, %.3f\n", 
+//            accelData[i][0], accelData[i][1],accelData[i][2], 
+//            gyroData[i][0], gyroData[i][1], gyroData[i][2]);
+//        }
 
         processRawData();
         sendProcessedData();
 
+        pc.printf("Done sending data\n");
+        
+        strcpy((char *)text, " Data Sent ");
+        oled.Label((uint8_t *)text, 22, 40);
+        
         // Wait for two minutes before trying to go back into the init sequence
         // again in order for the ML on the python side to complete
         Thread::wait(120000);
@@ -406,14 +433,26 @@ void processRawData(void)
     int16_t gyro1 = 0, gyro2 = 0, gyro3 = 0, accel1 = 0, accel2 = 0, accel3 = 0;
     uint8_t gyro1sign = 0, gyro2sign = 0, gyro3sign = 0, accel1sign = 0, accel2sign = 0, accel3sign = 0;
 
-    for (int i = 0; i < 50; i++) {
-        gyro1 = gyroData[i * 10][0] * 100;
-        gyro2 = gyroData[i * 10][1] * 100;
-        gyro3 = gyroData[i * 10][2] * 100;
-
-        accel1 = accelData[i * 10][0] * 100;
-        accel2 = accelData[i * 10][1] * 100;
-        accel3 = accelData[i * 10][2] * 100;
+    for (int i = 0; i < AVG_DATA_SIZE; i++) {
+        
+        // take average of every 10 samples
+        for (int j = 0; j < 10; j++) {
+            int nextIndex = (i * 10) + j;
+            gyro1 += gyroData[nextIndex][0] * 100;
+            gyro2 = gyroData[nextIndex][1] * 100;
+            gyro3 = gyroData[nextIndex][2] * 100;
+    
+            accel1 = accelData[nextIndex][0] * 100;
+            accel2 = accelData[nextIndex][1] * 100;
+            accel3 = accelData[nextIndex][2] * 100;
+        }
+        
+        gyro1 /= 10;
+        gyro2 /= 10;
+        gyro3 /= 10;
+        accel1 /= 10;
+        accel2 /= 10;
+        accel3 /= 10;
 
         gyro1sign = gyro1 > 0 ? 0 : 1;
         gyro2sign = gyro2 > 0 ? 0 : 1;
@@ -455,7 +494,7 @@ void processRawData(void)
 void sendProcessedData(void)
 {
     uint8_t message[19];
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < AVG_DATA_SIZE; i++) {
         message[0] = 0;
         for (int j = 0; j < 9; j++) {
             message[1 + j] = processedGyroData[i][j];
