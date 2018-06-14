@@ -5,8 +5,26 @@ import struct
 import time
 import numpy as np
 from sklearn import linear_model
+import pickle
 
 print("Done importing libraries.")
+
+print("Importing ML Models")
+
+wristModels = []
+elbowModels = []
+shoulderModels = []
+
+indices = np.arange(0.01, 5.01, 0.1)
+for i in indices:
+    currElbowFile = 'elbow{0:.2f}.sav'.format(i)
+    currWristFile = 'wrist{0:.2f}.sav'.format(i)
+    currShoulderFile = 'shoulder{0:.2f}.sav'.format(i)
+
+    wristModels.append(pickle.load(open(currWristFile, 'rb')))
+    elbowModels.append(pickle.load(open(currElbowFile, 'rb')))
+    shoulderModels.append(pickle.load(open(shoulderModels, 'rb')))
+
 
 # Global Variables
 numSamplesReceived = 0
@@ -35,7 +53,7 @@ timeArr = []
 foundInitSequence = False
 
 # Hexiwear Addresses
-elbow_hexi_addr = '00:06:40:08:00:31' # '00:35:40:08:00:48'
+elbow_hexi_addr = '00:06:40:08:00:31'  # '00:35:40:08:00:48'
 wrist_hexi_addr = ''
 shoulder_hexi_addr = ''
 
@@ -53,6 +71,8 @@ def try_until_success(func, exception=bluepy.btle.BTLEException, msg='reattempti
             break
 
 # This is a delegate for receiving BTLE events
+
+
 class ElbowBTEventHandler(DefaultDelegate):
     def __init__(self):
         DefaultDelegate.__init__(self)
@@ -92,29 +112,36 @@ class ElbowBTEventHandler(DefaultDelegate):
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
 
-            val1 = (recVals[2] << 8) | recVals[3]
-            val2 = (recVals[5] << 8) | recVals[6]
-            val3 = (recVals[8] << 8) | recVals[9]
-            val4 = (recVals[11] << 8) | recVals[12]
-            val5 = (recVals[14] << 8) | recVals[15]
-            val6 = (recVals[17] << 8) | recVals[18]
-            index = recVals[19];
+            val1 = (recVals[2] * 256) + recVals[3]
+            val2 = (recVals[5] * 256) + recVals[6]
+            val3 = (recVals[8] * 256) + recVals[9]
+            val4 = (recVals[11] * 256) + recVals[12]
+            val5 = (recVals[14] * 256) + recVals[15]
+            val6 = (recVals[17] * 256) + recVals[18]
+            index = recVals[19]
 
             # Reading Accel/velocity
             if recVals[0] == 0:
                 if len(elbowAngleZ) < index:
-                    elbowAccelerationX.append(val1 if recVals[1]*val1 == 0 else (-1 * val1))
-                    elbowAccelerationY.append(val2 if recVals[4]*val2 == 0 else (-1 * val2))
-                    elbowAccelerationZ.append(val3 if recVals[7]*val3 == 0 else (-1 * val3))
+                    elbowAngleX.append(
+                        val1 if recVals[1]*val1 == 0 else (-1 * val1))
+                    elbowAngleY.append(
+                        val2 if recVals[4]*val2 == 0 else (-1 * val2))
+                    elbowAngleZ.append(
+                        val3 if recVals[7]*val3 == 0 else (-1 * val3))
 
-                    elbowAngleX.append(val4 if recVals[10]*val4 == 0 else (-1 * val4))
-                    elbowAngleY.append(val5 if recVals[13]*val5 == 0 else (-1 * val5))
-                    elbowAngleZ.append(val6 if recVals[16]*val6 == 0 else (-1 * val6))
+                    elbowAccelerationX.append(
+                        val4 if recVals[10]*val4 == 0 else (-1 * val4))
+                    elbowAccelerationY.append(
+                        val5 if recVals[13]*val5 == 0 else (-1 * val5))
+                    elbowAccelerationZ.append(
+                        val6 if recVals[16]*val6 == 0 else (-1 * val6))
             # timeArr.append(time.clock() - time1)
 
             # This means that the wrist has gotten the start motion signal and we should now send the
             if recVals[0] == 3:
                 foundInitSequence = True
+
 
 '''
 class WristBTEventHandler(DefaultDelegate):
@@ -210,7 +237,8 @@ collectCommand = '22222222222222222222'
 # After all of the hexi's have been connected, then we should send this this:
 alertConnection = elbow_hexi.getCharacteristics(uuid="2031")[0]
 # alertConnection.write(connectCommand, True)
-try_until_success(alertConnection.write, msg='Error sending connection command', args=[connectCommand, True])
+try_until_success(alertConnection.write,
+                  msg='Error sending connection command', args=[connectCommand, True])
 
 # Infinite loop to receive notifications
 while True:
@@ -219,7 +247,8 @@ while True:
     if foundInitSequence:
         # Repeat this for all three Hexiwears
         # alertConnection.write(collectCommand, True)
-        try_until_success(alertConnection.write, msg='Error sending collection command', args=[collectCommand, True])
+        try_until_success(alertConnection.write, msg='Error sending collection command', args=[
+                          collectCommand, True])
 
         # stop sending collection command after a success
         foundInitSequence = False
@@ -227,6 +256,7 @@ while True:
     if len(elbowAngleZ) >= 50:
         # Do some computation with the samples that are received
         print("Got 50 samples")
+        fullModel = []
         # Convert to the full range -> so divide by 100 for all the terms:
         for i in range(0, 50):
             elbowAccelerationX[i] = float(elbowAccelerationX[i])/100.0
@@ -235,6 +265,27 @@ while True:
             elbowAngleX[i] = float(elbowAngleX[i])/100.0
             elbowAngleY[i] = float(elbowAngleY[i])/100.0
             elbowAngleZ[i] = float(elbowAngleZ[i])/100.0
+
+            currRow = []
+            currRow.append(elbowAngleX[i])
+            currRow.append(elbowAngleY[i])
+            currRow.append(elbowAngleZ[i])
+            currRow.append(elbowAccelerationX[i])
+            currRow.append(elbowAccelerationY[i])
+            currRow.append(elbowAccelerationZ[i])
+            fullModel.append(currRow)
+
+        # Ml Model wants angleX, angleY, angleZ, accelX, accelY, accelZ in one array:
+        accuracy = []
+        for i in range(0, 50):
+            accuracy.append(wristModels[i].predict(
+                fullModel[i].reshape(1, -1)))
+
+        print(accuracy)
+        if accuracy > 0.65:
+            print("It is a good shot")
+        else:
+            print("It is a bad shot")
 
         # Use some pre loaded machine learning model here to train and clasify the models!
         numSamplesReceived = 0
