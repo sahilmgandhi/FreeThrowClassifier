@@ -248,11 +248,11 @@ int main()
                 initTimer.start();
                 
                 // continue checking after first detection
-                while (temp_data[2]*9.8f > 9.0f) {
+                while (temp_data[2]*9.8f > 8.0f) {
                     accel.acquire_accel_data_g(temp_data);
                     
                     // if upside down for ~3 seconds, initial motion detected
-                    if (initTimer.read() >= 2) {
+                    if (initTimer.read_ms() >= 1500) {
                         foundInitSequence = true;
                         StartHaptic();
                         break;
@@ -312,7 +312,8 @@ int main()
         
         // Wait for two minutes before trying to go back into the init sequence
         // again in order for the ML on the python side to complete
-        Thread::wait(120000);
+//        Thread::wait(120000);
+        Thread::wait(10000);
         foundInitSequence = false;
     }
 
@@ -431,28 +432,29 @@ void processRawData(void)
     // Also we want to do some pre-processing and cleaning up here??
 
     int16_t gyro1 = 0, gyro2 = 0, gyro3 = 0, accel1 = 0, accel2 = 0, accel3 = 0;
+    float gyro11 = 0, gyro22 = 0, gyro33 = 0, accel11 = 0, accel22 = 0, accel33 = 0;
+
     uint8_t gyro1sign = 0, gyro2sign = 0, gyro3sign = 0, accel1sign = 0, accel2sign = 0, accel3sign = 0;
 
     for (int i = 0; i < AVG_DATA_SIZE; i++) {
-        
         // take average of every 10 samples
         for (int j = 0; j < 10; j++) {
             int nextIndex = (i * 10) + j;
-            gyro1 += gyroData[nextIndex][0] * 100;
-            gyro2 = gyroData[nextIndex][1] * 100;
-            gyro3 = gyroData[nextIndex][2] * 100;
+            gyro11 += gyroData[nextIndex][0];
+            gyro22 += gyroData[nextIndex][1];
+            gyro33 += gyroData[nextIndex][2];
     
-            accel1 = accelData[nextIndex][0] * 100;
-            accel2 = accelData[nextIndex][1] * 100;
-            accel3 = accelData[nextIndex][2] * 100;
+            accel11 += accelData[nextIndex][0];
+            accel22 += accelData[nextIndex][1];
+            accel33 += accelData[nextIndex][2];
         }
         
-        gyro1 /= 10;
-        gyro2 /= 10;
-        gyro3 /= 10;
-        accel1 /= 10;
-        accel2 /= 10;
-        accel3 /= 10;
+        gyro1 = gyro11 * 10;
+        gyro2 = gyro22 * 10;
+        gyro3 = gyro33 * 10;
+        accel1 = accel11 * 10;
+        accel2 = accel22 * 10;
+        accel3 = accel33 * 10;
 
         gyro1sign = gyro1 > 0 ? 0 : 1;
         gyro2sign = gyro2 > 0 ? 0 : 1;
@@ -493,14 +495,15 @@ void processRawData(void)
 // This sends the data over to the Raspberry Pi
 void sendProcessedData(void)
 {
-    uint8_t message[19];
+    uint8_t message[20];
     for (int i = 0; i < AVG_DATA_SIZE; i++) {
         message[0] = 0;
         for (int j = 0; j < 9; j++) {
             message[1 + j] = processedGyroData[i][j];
             message[10 + j] = processedAccelData[i][j];
         }
-        kw40z_device.SendAlert(message, 19);
+        message[19] = i+1;
+        kw40z_device.SendAlert(message, 20);
         Thread::wait(50);
     }
 }

@@ -6,6 +6,8 @@ import time
 import numpy as np
 from sklearn import linear_model
 
+print("Done importing libraries.")
+
 # Global Variables
 numSamplesReceived = 0
 elbowAccelerationX = []
@@ -14,6 +16,21 @@ elbowAccelerationZ = []
 elbowAngleX = []
 elbowAngleY = []
 elbowAngleZ = []
+
+wristAccelerationX = []
+wristAccelerationY = []
+wristAccelerationZ = []
+wristAngleX = []
+wristAngleY = []
+wristAngleZ = []
+
+shoulderAccelerationX = []
+shoulderAccelerationY = []
+shoulderAccelerationZ = []
+shoulderAngleX = []
+shoulderAngleY = []
+shoulderAngleZ = []
+
 timeArr = []
 foundInitSequence = False
 
@@ -36,8 +53,6 @@ def try_until_success(func, exception=bluepy.btle.BTLEException, msg='reattempti
             break
 
 # This is a delegate for receiving BTLE events
-
-
 class ElbowBTEventHandler(DefaultDelegate):
     def __init__(self):
         DefaultDelegate.__init__(self)
@@ -45,11 +60,13 @@ class ElbowBTEventHandler(DefaultDelegate):
     def handleDiscovery(self, dev, isNewDev, isNewData):
         # Advertisement Data
         if isNewDev:
-            print("Found new device:", dev.addr, dev.getScanData())
+            pass
+            # print("Found new device:", dev.addr, dev.getScanData())
 
         # Scan Response
         if isNewData:
-            print("Received more data", dev.addr, dev.getScanData())
+            pass
+            # print("Received more data", dev.addr, dev.getScanData())
 
     def handleNotification(self, cHandle, data):
 
@@ -60,7 +77,6 @@ class ElbowBTEventHandler(DefaultDelegate):
         global elbowAngleY
         global elbowAngleZ
         global timeArr
-        global numSamplesReceived
         global foundInitSequence
 
         # Format of the data will be as follows:
@@ -82,21 +98,83 @@ class ElbowBTEventHandler(DefaultDelegate):
             val4 = (recVals[11] << 8) | recVals[12]
             val5 = (recVals[14] << 8) | recVals[15]
             val6 = (recVals[17] << 8) | recVals[18]
+            index = recVals[19];
+
             # Reading Accel/velocity
             if recVals[0] == 0:
-                elbowAccelerationX.append(val1 if recVals[1]*val1 == 0 else (-1 * val1))
-                elbowAccelerationY.append(val2 if recVals[4]*val2 == 0 else (-1 * val2))
-                elbowAccelerationZ.append(val3 if recVals[7]*val3 == 0 else (-1 * val3))
+                if len(elbowAngleZ) < index:
+                    elbowAccelerationX.append(val1 if recVals[1]*val1 == 0 else (-1 * val1))
+                    elbowAccelerationY.append(val2 if recVals[4]*val2 == 0 else (-1 * val2))
+                    elbowAccelerationZ.append(val3 if recVals[7]*val3 == 0 else (-1 * val3))
 
-                elbowAngleX.append(val4 if recVals[10]*val4 == 0 else (-1 * val4))
-                elbowAngleY.append(val5 if recVals[13]*val5 == 0 else (-1 * val5))
-                elbowAngleZ.append(val6 if recVals[16]*val6 == 0 else (-1 * val6))
-                numSamplesReceived += 1
+                    elbowAngleX.append(val4 if recVals[10]*val4 == 0 else (-1 * val4))
+                    elbowAngleY.append(val5 if recVals[13]*val5 == 0 else (-1 * val5))
+                    elbowAngleZ.append(val6 if recVals[16]*val6 == 0 else (-1 * val6))
             # timeArr.append(time.clock() - time1)
 
             # This means that the wrist has gotten the start motion signal and we should now send the
             if recVals[0] == 3:
                 foundInitSequence = True
+
+'''
+class WristBTEventHandler(DefaultDelegate):
+    def __init__(self):
+        DefaultDelegate.__init__(self)
+
+    def handleDiscovery(self, dev, isNewDev, isNewData):
+        # Advertisement Data
+        if isNewDev:
+            # print("Found new device:", dev.addr, dev.getScanData())
+
+        # Scan Response
+        if isNewData:
+            # print("Received more data", dev.addr, dev.getScanData())
+
+    def handleNotification(self, cHandle, data):
+
+        global wristAccelerationX
+        global wristAccelerationY
+        global wristAccelerationZ
+        global wristAngleX
+        global wristAngleY
+        global wristAngleZ
+        global foundInitSequence
+
+        # Format of the data will be as follows:
+        # a[0] => 0 means we are reading acceleration/velocity, 1 means angular velocity/angle
+        # 1, 4, 7, 10, 13, 16 are sign bits
+        # 2, 5, 8, 11, 14, 17 are the bits 8-15
+        # 3, 6, 9, 12, 15, 18 are the bits 0-7
+
+        # Each iteration of this loop (all the appending) takes 0.006 seconds at max.
+        # Thus that is what we should be using between sending the BLE signals at minimum!
+        if cHandle == 101:
+            recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
+            print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
+
+            val1 = (recVals[2] << 8) | recVals[3]
+            val2 = (recVals[5] << 8) | recVals[6]
+            val3 = (recVals[8] << 8) | recVals[9]
+            val4 = (recVals[11] << 8) | recVals[12]
+            val5 = (recVals[14] << 8) | recVals[15]
+            val6 = (recVals[17] << 8) | recVals[18]
+            index = recVals[19];
+
+            # Reading Accel/velocity
+            if recVals[0] == 0:
+                if len(elbowAngleZ) < index:
+                    wristAccelerationX.append(val1 if recVals[1]*val1 == 0 else (-1 * val1))
+                    wristAccelerationY.append(val2 if recVals[4]*val2 == 0 else (-1 * val2))
+                    wristAccelerationZ.append(val3 if recVals[7]*val3 == 0 else (-1 * val3))
+
+                    wristAngleX.append(val4 if recVals[10]*val4 == 0 else (-1 * val4))
+                    wristAngleY.append(val5 if recVals[13]*val5 == 0 else (-1 * val5))
+                    wristAngleZ.append(val6 if recVals[16]*val6 == 0 else (-1 * val6))
+
+            # This means that the wrist has gotten the start motion signal and we should now send the
+            if recVals[0] == 3:
+                foundInitSequence = True
+'''
 
 
 print("Adding the handler")
@@ -146,7 +224,7 @@ while True:
         # stop sending collection command after a success
         foundInitSequence = False
 
-    if numSamplesReceived >= 50:
+    if len(elbowAngleZ) >= 50:
         # Do some computation with the samples that are received
         print("Got 50 samples")
         # Convert to the full range -> so divide by 100 for all the terms:
@@ -160,4 +238,11 @@ while True:
 
         # Use some pre loaded machine learning model here to train and clasify the models!
         numSamplesReceived = 0
+        elbowAccelerationX = []
+        elbowAccelerationY = []
+        elbowAccelerationZ = []
+
+        elbowAngleX = []
+        elbowAngleY = []
+        elbowAngleZ = []
         time.sleep(10)
