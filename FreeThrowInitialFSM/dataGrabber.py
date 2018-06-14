@@ -23,7 +23,7 @@ for i in indices:
 
     wristModels.append(pickle.load(open(currWristFile, 'rb')))
     elbowModels.append(pickle.load(open(currElbowFile, 'rb')))
-    shoulderModels.append(pickle.load(open(shoulderModels, 'rb')))
+    shoulderModels.append(pickle.load(open(currShoulderFile, 'rb')))
 
 
 # Global Variables
@@ -277,12 +277,12 @@ while True:
 
         # Ml Model wants angleX, angleY, angleZ, accelX, accelY, accelZ in one array:
         accuracy = []
-        for i in range(0, 50):
-            accuracy.append(wristModels[i].predict(
-                fullModel[i].reshape(1, -1)))
+        for i in range(5, 35):
+            currModel = np.array(fullModel[i]).reshape(1, -1)
+            accuracy.append(wristModels[i].predict(currModel))
 
-        print(accuracy)
-        if accuracy > 0.65:
+        print(np.average(accuracy))
+        if np.average(accuracy) > 0.5:
             print("It is a good shot")
         else:
             print("It is a bad shot")

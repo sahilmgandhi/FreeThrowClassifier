@@ -135,8 +135,7 @@ void StopHaptic(void const *n)
 void ButtonRight(void)
 {
     StartHaptic();
-    kw40z_device.ToggleAdvertisementMode();
-    blueLed = !blueLed;
+    connectedToPi = false;
 }
 
 void ButtonLeft(void)
@@ -224,6 +223,24 @@ int main()
     accel.accel_config();    
         
     while (1) {
+        oled.FillScreen(COLOR_BLACK);
+        /* Change font color to Blue */
+        textProperties.fontColor = COLOR_BLUE;
+        oled.SetTextProperties(&textProperties);
+    
+        /* Display Bluetooth Label at x=17,y=65 */
+        strcpy((char *)text, "BLUETOOTH");
+        oled.Label((uint8_t *)text, 17, 65);
+    
+        /* Change font color to white */
+        textProperties.fontColor = COLOR_WHITE;
+        textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
+        oled.SetTextProperties(&textProperties);
+    
+        /* Display Label at x=22,y=80 */
+        strcpy((char *)text, "Tap Below");
+        oled.Label((uint8_t *)text, 22, 80);
+        
         while (!connectedToPi) {
             // Busy wait here until the PI has connected to the Hexi!
             Thread::wait(50);
@@ -238,6 +255,10 @@ int main()
 
         pc.printf("Waiting for init sequence\n");
         while (!foundInitSequence) {
+            if (!connectedToPi) {
+                break;
+            }
+            
             // Some code here to find initial sequence to start the action:
             float temp_data[3];
             accel.acquire_accel_data_g(temp_data);
@@ -262,6 +283,9 @@ int main()
                 initTimer.reset();
             }
             greenLed = LED_OFF;
+        }
+        if (!connectedToPi) {
+            continue;
         }
         
         pc.printf("Found init sequence\n");
@@ -313,17 +337,9 @@ int main()
         // Wait for two minutes before trying to go back into the init sequence
         // again in order for the ML on the python side to complete
 //        Thread::wait(120000);
-        Thread::wait(10000);
+        Thread::wait(5000);
         foundInitSequence = false;
     }
-
-    // txThread.start(txTask); /*Start transmitting Sensor Tag Data */
-
-    // while (true) {
-    //   // blueLed = !kw40z_device.GetAdvertisementMode(); /*Indicate BLE
-    //   // Advertisment Mode*/
-    //   Thread::wait(50);
-    // }
 }
 
 /******************************End of Main*************************************/
@@ -437,6 +453,13 @@ void processRawData(void)
     uint8_t gyro1sign = 0, gyro2sign = 0, gyro3sign = 0, accel1sign = 0, accel2sign = 0, accel3sign = 0;
 
     for (int i = 0; i < AVG_DATA_SIZE; i++) {
+        gyro11 = 0;
+        gyro22 = 0;
+        gyro33 = 0;
+        accel11 = 0;
+        accel22 = 0;
+        accel33 = 0;
+        
         // take average of every 10 samples
         for (int j = 0; j < 10; j++) {
             int nextIndex = (i * 10) + j;
@@ -447,14 +470,23 @@ void processRawData(void)
             accel11 += accelData[nextIndex][0];
             accel22 += accelData[nextIndex][1];
             accel33 += accelData[nextIndex][2];
-        }
+        }    
+
+        gyro1 = gyro11 / 10 * 100;
+        gyro2 = gyro22 / 10 * 100;
+        gyro3 = gyro33 / 10 * 100;
+        accel1 = accel11 / 10 * 100;
+        accel2 = accel22 / 10 * 100;
+        accel3 = accel33 / 10 * 100;
         
-        gyro1 = gyro11 * 10;
-        gyro2 = gyro22 * 10;
-        gyro3 = gyro33 * 10;
-        accel1 = accel11 * 10;
-        accel2 = accel22 * 10;
-        accel3 = accel33 * 10;
+//        gyro1 = gyroData[i*10][0] * 100;
+//        gyro2 = gyroData[i*10][1] * 100;
+//        gyro3 = gyroData[i*10][2] * 100;
+//
+//        accel1 = accelData[i*10][0] * 100;
+//        accel2 = accelData[i*10][1] * 100;
+//        accel3 = accelData[i*10][2] * 100;
+
 
         gyro1sign = gyro1 > 0 ? 0 : 1;
         gyro2sign = gyro2 > 0 ? 0 : 1;
