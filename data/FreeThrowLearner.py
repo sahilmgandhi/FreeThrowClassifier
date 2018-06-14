@@ -34,7 +34,6 @@ for data in dataArr:
 
 print(accuracyArr)
 
-'''
 data = np.genfromtxt('wrist2.01.csv', delimiter=',')
 
 train, test = train_test_split(data, test_size=0.3)
@@ -58,4 +57,3 @@ accuracy = logreg.score(X_test, Y_test)
 print(X_test[1].reshape(1, -1))
 print(logreg.predict(X_test[1].reshape(1, -1)))
 print("The accuracy was {}".format(accuracy))
-'''
