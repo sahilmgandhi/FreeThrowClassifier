@@ -25,7 +25,6 @@ for i in indices:
     elbowModels.append(pickle.load(open(currElbowFile, 'rb')))
     shoulderModels.append(pickle.load(open(currShoulderFile, 'rb')))
 
-
 # Global Variables
 elbowAccelerationX = []
 elbowAccelerationY = []
@@ -425,7 +424,7 @@ while True:
         print("Elbow Accuracy: {}".format(np.average(elbowAccuracy)))
         print("Shoulder Accuracy: {}".format(np.average(shoulderAccuracy)))
 
-        # Weigh wrist more than elbow 
+        # Weigh wrist more than elbow
 
         wrist_weight = 0.75
         elbow_weight = 0.21
@@ -478,7 +477,6 @@ while True:
             print("That was worse than a print statment in an ISR. You're fired!")
             try_until_success(alertConnection2.write,
                   msg='Error notifying wrist', args=[notifyBad, True])
-
 
         # Use some pre loaded machine learning model here to train and clasify the models!
         elbowAccelerationX = []
