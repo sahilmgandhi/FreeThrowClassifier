@@ -136,6 +136,30 @@ void ButtonRight(void)
 {
     StartHaptic();
     connectedToPi = false;
+    kw40z_device.ToggleAdvertisementMode();
+    blueLed = !blueLed;
+
+    /* Get OLED Class Default Text Properties */
+    oled_text_properties_t textProperties = {0};
+    oled.GetTextProperties(&textProperties);
+    oled.FillScreen(COLOR_BLACK);
+
+    /* Change font color to Blue */
+    textProperties.fontColor = COLOR_BLUE;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Bluetooth Label at x=17,y=65 */
+    strcpy((char *)text, "BLUETOOTH");
+    oled.Label((uint8_t *)text, 17, 65);
+
+    /* Change font color to white */
+    textProperties.fontColor = COLOR_WHITE;
+    textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Label at x=22,y=80 */
+    strcpy((char *)text, "Tap Below");
+    oled.Label((uint8_t *)text, 22, 80);
 }
 
 void ButtonLeft(void)
@@ -223,7 +247,7 @@ int main()
     accel.accel_config();    
         
     while (1) {
-        while (!connectedToPi) {
+        while (!connectedToPi) {            
             // Busy wait here until the PI has connected to the Hexi!
             Thread::wait(50);
         }
@@ -237,9 +261,18 @@ int main()
         
         // wait for message from the Pi
         while (!startCollection) {
+            // exit and continue outer while loop if disconnected
+            if (!connectedToPi) {
+                break;
+            }
             Thread::wait(50);
         }
         startCollection = false;
+
+        // exit and continue outer while loop if disconnected
+        if (!connectedToPi) {
+            continue;
+        }
         
         Thread::wait(1000);
         

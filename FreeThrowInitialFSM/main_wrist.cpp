@@ -136,6 +136,31 @@ void ButtonRight(void)
 {
     StartHaptic();
     connectedToPi = false;
+    kw40z_device.ToggleAdvertisementMode();
+    blueLed = !blueLed;
+
+    /* Get OLED Class Default Text Properties */
+    oled_text_properties_t textProperties = {0};
+    oled.GetTextProperties(&textProperties);
+
+    oled.FillScreen(COLOR_BLACK);
+    /* Change font color to Blue */
+    textProperties.fontColor = COLOR_BLUE;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Bluetooth Label at x=17,y=65 */
+    strcpy((char *)text, "BLUETOOTH");
+    oled.Label((uint8_t *)text, 17, 65);
+
+    /* Change font color to white */
+    textProperties.fontColor = COLOR_WHITE;
+    textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Label at x=22,y=80 */
+    strcpy((char *)text, "Tap Below");
+    oled.Label((uint8_t *)text, 22, 80);
+
 }
 
 void ButtonLeft(void)
@@ -166,15 +191,29 @@ void AlertReceived(uint8_t *data, uint8_t length)
     // CMD for turning on: '11111111111111111111'
     if (data[4] == '1') {
         connectedToPi = true;
-        // greenLed = LED_ON;
-        //        redLed = LED_ON;
 
-        // CMD for turning off: 'ledoffledoffledoffled'
     } else if (data[4] == '2') {
-        // greenLed = LED_OFF;
-        //        redLed = LED_OFF;
         startCollection = true;
+
+    } else if (data[4] == '4') {
+        oled.FillScreen(COLOR_BLUE);
+        oled_text_properties_t textProperties = {0};
+        textProperties.fontColor = COLOR_WHITE;
+        oled.SetTextProperties(&textProperties);
+
+        strcpy((char *)text, "Good Shot");
+        oled.Label((uint8_t *)text, 22, 40);
+
+    } else if (data[4] == '5') {
+        oled.FillScreen(COLOR_RED);
+        oled_text_properties_t textProperties = {0};
+        textProperties.fontColor = COLOR_WHITE;
+        oled.SetTextProperties(&textProperties);
+
+        strcpy((char *)text, "Bad Shot");
+        oled.Label((uint8_t *)text, 22, 40);
     }
+
 }
 /***********************End of Call Back Functions*****************************/
 
@@ -202,28 +241,29 @@ int main()
     oled_text_properties_t textProperties = {0};
     oled.GetTextProperties(&textProperties);
         
+    oled.FillScreen(COLOR_BLACK);
+    /* Change font color to Blue */
+    textProperties.fontColor = COLOR_BLUE;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Bluetooth Label at x=17,y=65 */
+    strcpy((char *)text, "BLUETOOTH");
+    oled.Label((uint8_t *)text, 17, 65);
+
+    /* Change font color to white */
+    textProperties.fontColor = COLOR_WHITE;
+    textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
+    oled.SetTextProperties(&textProperties);
+
+    /* Display Label at x=22,y=80 */
+    strcpy((char *)text, "Tap Below");
+    oled.Label((uint8_t *)text, 22, 80);
+
+
     gyro.gyro_config();
     accel.accel_config();    
         
     while (1) {
-        oled.FillScreen(COLOR_BLACK);
-        /* Change font color to Blue */
-        textProperties.fontColor = COLOR_BLUE;
-        oled.SetTextProperties(&textProperties);
-    
-        /* Display Bluetooth Label at x=17,y=65 */
-        strcpy((char *)text, "BLUETOOTH");
-        oled.Label((uint8_t *)text, 17, 65);
-    
-        /* Change font color to white */
-        textProperties.fontColor = COLOR_WHITE;
-        textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
-        oled.SetTextProperties(&textProperties);
-    
-        /* Display Label at x=22,y=80 */
-        strcpy((char *)text, "Tap Below");
-        oled.Label((uint8_t *)text, 22, 80);
-        
         while (!connectedToPi) {
             // Busy wait here until the PI has connected to the Hexi!
             Thread::wait(50);
@@ -238,6 +278,7 @@ int main()
 
         // pc.printf("Waiting for init sequence\n");
         while (!foundInitSequence) {
+            // exit and continue outer while loop if disconnected
             if (!connectedToPi) {
                 break;
             }
@@ -281,9 +322,16 @@ int main()
         
         // wait for message for the Pi
         while (!startCollection) {
+            // continue outer while loop if we got disconnected
+            if (!connectedToPi) {
+                break;
+            }
             Thread::wait(50);
         }
         startCollection = false;
+        if (!connectedToPi) {
+            continue;
+        }
         
         Thread::wait(1000);
         
@@ -320,7 +368,7 @@ int main()
         // Wait for two minutes before trying to go back into the init sequence
         // again in order for the ML on the python side to complete
 //        Thread::wait(120000);
-        Thread::wait(5000);
+        Thread::wait(10000);
         foundInitSequence = false;
     }
 }

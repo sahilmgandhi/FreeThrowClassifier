@@ -108,7 +108,6 @@ class ElbowBTEventHandler(DefaultDelegate):
         if cHandle == 101:
             # time1 = time.clock()
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
-            print("Elbow:")
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
 
             val1 = (recVals[2] * 256) + recVals[3]
@@ -175,7 +174,6 @@ class WristBTEventHandler(DefaultDelegate):
         # Thus that is what we should be using between sending the BLE signals at minimum!
         if cHandle == 101:
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
-            print("Wrist:")
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
 
             val1 = (recVals[2] * 256) + recVals[3]
@@ -314,6 +312,11 @@ alerts_desc3.write(b"\x01", True)
 
 connectCommand = '11111111111111111111'
 collectCommand = '22222222222222222222'
+
+# send notification back to Hexiwear
+notifyGood = '44444444444444444444'
+notifyBad  = '55555555555555555555'
+
 # After all of the hexi's have been connected, then we should send this this:
 alertConnection = elbow_hexi.getCharacteristics(uuid="2031")[0]
 alertConnection2 = wrist_hexi.getCharacteristics(uuid="2031")[0]
@@ -424,15 +427,57 @@ while True:
 
         # Weigh wrist more than elbow 
 
-        wrist_weight = 0.7
-        elbow_weight = 0.3
-        shoulder_weight = 1.0
+        wrist_weight = 0.75
+        elbow_weight = 0.21
+        shoulder_weight = 0.04
 
-        print("Total score with weights was {}".format(np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight))
-        if (np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight) > 0.5:
-            print("It is a good shot")
+        averageScore = np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight
+
+        print("Total score with weights was {}".format(averageScore))
+        if averageScore == 1.0:
+            print("You're fit for the NBA!")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyGood, True])
+        elif averageScore > 0.8:
+            print("Wow! Great shot!")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyGood, True])
+        elif averageScore > 0.7:
+            print("Nice job! That was good!")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyGood, True])
+        elif averageScore > 0.6:
+            print("That was a decent shot.")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyGood, True])
+        elif averageScore > 0.5:
+            print("Good shot, but just barely.")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyGood, True])
+        elif averageScore > 0.4:
+            print("Not you're best attempt...")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
+        elif averageScore > 0.3:
+            print("Yikes, check your form")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
+        elif averageScore > 0.2:
+            print("Maybe try another sport, like baseball?")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
+        elif averageScore > 0.1:
+            print("The ball is supposed to go into the hoop...")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
+        elif averageScore > 0.05:
+            print("Are you even trying to do a good shot?")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
         else:
-            print("It is a bad shot")
+            print("That was worse than a print statment in an ISR. You're fired!")
+            try_until_success(alertConnection2.write,
+                  msg='Error notifying wrist', args=[notifyBad, True])
 
 
         # Use some pre loaded machine learning model here to train and clasify the models!
