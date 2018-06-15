@@ -52,9 +52,9 @@ timeArr = []
 foundInitSequence = False
 
 # Hexiwear Addresses
-elbow_hexi_addr = '00:35:40:08:00:48'
+elbow_hexi_addr = '00:2E:40:08:00:31'
 wrist_hexi_addr = '00:06:40:08:00:31'
-shoulder_hexi_addr = ''
+shoulder_hexi_addr = '00:35:40:08:00:48'
 
 
 def try_until_success(func, exception=bluepy.btle.BTLEException, msg='reattempting', args=[]):
@@ -108,6 +108,7 @@ class ElbowBTEventHandler(DefaultDelegate):
         if cHandle == 101:
             # time1 = time.clock()
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
+            print("Elbow:")
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
 
             val1 = (recVals[2] * 256) + recVals[3]
@@ -174,6 +175,7 @@ class WristBTEventHandler(DefaultDelegate):
         # Thus that is what we should be using between sending the BLE signals at minimum!
         if cHandle == 101:
             recVals = struct.unpack('BBBBBBBBBBBBBBBBBBBB', data)
+            print("Wrist:")
             print(struct.unpack('BBBBBBBBBBBBBBBBBBBB', data))
 
             val1 = (recVals[2] * 256) + recVals[3]
@@ -186,7 +188,7 @@ class WristBTEventHandler(DefaultDelegate):
 
             # Reading Accel/velocity
             if recVals[0] == 0:
-                if len(elbowAngleZ) < index:
+                if len(wristAngleZ) < index:
                     wristAngleX.append(
                         val1 if recVals[1]*val1 == 0 else (-1 * val1))
                     wristAngleY.append(
@@ -254,7 +256,7 @@ class ShoulderBTEventHandler(DefaultDelegate):
 
             # Reading Accel/velocity
             if recVals[0] == 0:
-                if len(elbowAngleZ) < index:
+                if len(shoulderAngleZ) < index:
                     shoulderAngleX.append(
                         val1 if recVals[1]*val1 == 0 else (-1 * val1))
                     shoulderAngleY.append(
@@ -268,10 +270,6 @@ class ShoulderBTEventHandler(DefaultDelegate):
                         val5 if recVals[13]*val5 == 0 else (-1 * val5))
                     shoulderAccelerationZ.append(
                         val6 if recVals[16]*val6 == 0 else (-1 * val6))
-
-            # This means that the wrist has gotten the start motion signal and we should now send the
-            if recVals[0] == 3:
-                foundInitSequence = True
 
 
 print("Adding the handler")
@@ -297,55 +295,58 @@ try_until_success(wrist_hexi.connect,
                   msg='error connecting to wrist', args=[wrist_hexi_addr])
 try_until_success(elbow_hexi.connect, msg='error connecting to elbow',
                   args=[elbow_hexi_addr])
+try_until_success(shoulder_hexi.connect, msg='error connecting to shoulder',
+                  args=[shoulder_hexi_addr])
 
 print("Connected to device!")
 
-# Get the battery service
-battery = elbow_hexi.getCharacteristics(uuid="2a19")[0]
-# Get the client configuration descriptor and write 1 to it to enable notification
-battery_desc = battery.getDescriptors(forUUID=0x2902)[0]
-battery_desc.write(b"\x01", True)
+alerts2 = wrist_hexi.getCharacteristics(uuid="2032")[0]
+alerts_desc2 = alerts2.getDescriptors(forUUID=0x2902)[0]
+alerts_desc2.write(b"\x01", True)
 
 alerts = elbow_hexi.getCharacteristics(uuid="2032")[0]
 alerts_desc = alerts.getDescriptors(forUUID=0x2902)[0]
 alerts_desc.write(b"\x01", True)
 
-# Get the battery service
-battery2 = wrist_hexi.getCharacteristics(uuid="2a19")[0]
-# Get the client configuration descriptor and write 1 to it to enable notification
-battery_desc2 = battery2.getDescriptors(forUUID=0x2902)[0]
-battery_desc2.write(b"\x01", True)
-
-alerts2 = wrist_hexi.getCharacteristics(uuid="2032")[0]
-alerts_desc2 = alerts2.getDescriptors(forUUID=0x2902)[0]
-alerts_desc2.write(b"\x01", True)
+alerts3 = shoulder_hexi.getCharacteristics(uuid="2032")[0]
+alerts_desc3 = alerts3.getDescriptors(forUUID=0x2902)[0]
+alerts_desc3.write(b"\x01", True)
 
 connectCommand = '11111111111111111111'
 collectCommand = '22222222222222222222'
 # After all of the hexi's have been connected, then we should send this this:
 alertConnection = elbow_hexi.getCharacteristics(uuid="2031")[0]
 alertConnection2 = wrist_hexi.getCharacteristics(uuid="2031")[0]
+alertConnection3 = shoulder_hexi.getCharacteristics(uuid="2031")[0]
+
 try_until_success(alertConnection.write,
-                  msg='Error sending connection command', args=[connectCommand, True])
+                  msg='Error sending elbow connection command', args=[connectCommand, True])
 try_until_success(alertConnection2.write,
-                  msg='Error sending connection command', args=[connectCommand, True])
+                  msg='Error sending wrist connection command', args=[connectCommand, True])
+try_until_success(alertConnection3.write,
+                  msg='Error sending shoulder connection command', args=[connectCommand, True])
 
 # Infinite loop to receive notifications
 while True:
-    elbow_hexi.waitForNotifications(5.0)
+    wrist_hexi.waitForNotifications(1.0)
+    elbow_hexi.waitForNotifications(1.0)
+    shoulder_hexi.waitForNotifications(1.0)
 
     if foundInitSequence:
+        print("Found initial sequence")
         # Repeat this for all three Hexiwears
         # alertConnection.write(collectCommand, True)
-        try_until_success(alertConnection.write, msg='Error sending collection command', args=[
+        try_until_success(alertConnection.write, msg='Error sending elbow collection command', args=[
                           collectCommand, True])
-        try_until_success(alertConnection2.write, msg='Error sending collection command', args=[
+        try_until_success(alertConnection2.write, msg='Error sending wrist collection command', args=[
+                          collectCommand, True])
+        try_until_success(alertConnection3.write, msg='Error sending shoulder collection command', args=[
                           collectCommand, True])
 
         # stop sending collection command after a success
         foundInitSequence = False
 
-    if len(elbowAngleZ) >= 50 and len(wristAngleZ) >= 50:
+    if len(elbowAngleZ) >= 50 and len(wristAngleZ) >= 50 and len(shoulderAngleZ) >= 50:
         # if len(elbowAngleZ) >= 50 and len(shoulderAngleZ) >= 50 and len(wristAngleZ) >= 50:
         # Do some computation with the samples that are received
         print("Got 50 samples")
@@ -377,21 +378,21 @@ while True:
             shoulderAngleZ[i] = float(shoulderAngleZ[i])/100.0
 
             currWristRow = []
-            currWristRow.append(elbowAngleX[i])
-            currWristRow.append(elbowAngleY[i])
-            currWristRow.append(elbowAngleZ[i])
-            currWristRow.append(elbowAccelerationX[i])
-            currWristRow.append(elbowAccelerationY[i])
-            currWristRow.append(elbowAccelerationZ[i])
+            currWristRow.append(wristAngleX[i])
+            currWristRow.append(wristAngleY[i])
+            currWristRow.append(wristAngleZ[i])
+            currWristRow.append(wristAccelerationX[i])
+            currWristRow.append(wristAccelerationY[i])
+            currWristRow.append(wristAccelerationZ[i])
             fullWristModel.append(currWristRow)
 
             currShoulderRow = []
-            currShoulderRow.append(elbowAngleX[i])
-            currShoulderRow.append(elbowAngleY[i])
-            currShoulderRow.append(elbowAngleZ[i])
-            currShoulderRow.append(elbowAccelerationX[i])
-            currShoulderRow.append(elbowAccelerationY[i])
-            currShoulderRow.append(elbowAccelerationZ[i])
+            currShoulderRow.append(shoulderAngleX[i])
+            currShoulderRow.append(shoulderAngleY[i])
+            currShoulderRow.append(shoulderAngleZ[i])
+            currShoulderRow.append(shoulderAccelerationX[i])
+            currShoulderRow.append(shoulderAccelerationY[i])
+            currShoulderRow.append(shoulderAccelerationZ[i])
             fullShoulderModel.append(currShoulderRow)
 
             currElbowRow = []
@@ -417,11 +418,22 @@ while True:
             currModel = np.array(fullShoulderModel[i]).reshape(1, -1)
             shoulderAccuracy.append(shoulderModels[i].predict(currModel))
 
-        print(np.average(wristAccuracy))
-        if np.average(wristAccuracy) > 0.5:
+        print("Wrist Accuracy: {}".format(np.average(wristAccuracy)))
+        print("Elbow Accuracy: {}".format(np.average(elbowAccuracy)))
+        print("Shoulder Accuracy: {}".format(np.average(shoulderAccuracy)))
+
+        # Weigh wrist more than elbow 
+
+        wrist_weight = 0.7
+        elbow_weight = 0.3
+        shoulder_weight = 1.0
+
+        print("Total score with weights was {}".format(np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight))
+        if (np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight) > 0.5:
             print("It is a good shot")
         else:
             print("It is a bad shot")
+
 
         # Use some pre loaded machine learning model here to train and clasify the models!
         elbowAccelerationX = []
