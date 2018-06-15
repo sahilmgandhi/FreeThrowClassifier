@@ -14,7 +14,7 @@
 #define SYSTICK_PERIOD .01
 
 void UpdateSensorData(void);
-void StartHaptic(void);
+//void StartHaptic(void);
 void StopHaptic(void const *n);
 void txTask(void);
 
@@ -22,6 +22,13 @@ void txTask(void);
 void ButtonRight(void);
 void ButtonLeft(void);
 void PassKey(void);
+
+
+// This runs in systick to collect data, integrate to get angle, and save the values
+void updateValues();
+
+// This resets the global variables and data index used in data collection
+void resetValues();
 
 /*
  * This function collects the raw data samples and places them into the
@@ -47,6 +54,7 @@ void sendProcessedData(void);
 Serial pc(USBTX, USBRX);
 
 DigitalOut blueLed(LED3);
+DigitalOut greenLed(LED2, LED_OFF);
 DigitalOut haptic(PTB9);
 
 /* Define timer for haptic feedback */
@@ -64,6 +72,9 @@ Thread txThread;
 /* Instantiate the gyroscope and accelerometer */
 FXAS21002 gyro(PTC11, PTC10);
 FXOS8700 accel(PTC11, PTC10);
+
+/* Timer for initial motion */
+Timer initTimer;
 
 /* Systick ticker for data collection */
 Ticker systick;
@@ -124,8 +135,7 @@ void StopHaptic(void const *n)
 void ButtonRight(void)
 {
     StartHaptic();
-    kw40z_device.ToggleAdvertisementMode();
-    blueLed = !blueLed;
+    connectedToPi = false;
 }
 
 void ButtonLeft(void)
@@ -150,7 +160,7 @@ void AlertReceived(uint8_t *data, uint8_t length)
 {
     StartHaptic();
     data[19] = 0;
-    // pc.printf("%s\n\r", data);
+    pc.printf("%s\n\r", data);
 
     // data (our command) must 20 bytes long.
     // CMD for turning on: '11111111111111111111'
@@ -168,10 +178,13 @@ void AlertReceived(uint8_t *data, uint8_t length)
 }
 /***********************End of Call Back Functions*****************************/
 
+
 /********************************Main******************************************/
 
 int main()
 {
+    pc.printf("This program has started\n");
+    
     /* Register callbacks to application functions */
     kw40z_device.attach_buttonLeft(&ButtonLeft);
     kw40z_device.attach_buttonRight(&ButtonRight);
@@ -205,59 +218,82 @@ int main()
     /* Display Label at x=22,y=80 */
     strcpy((char *)text, "Tap Below");
     oled.Label((uint8_t *)text, 22, 80);
-
+        
+    gyro.gyro_config();
+    accel.accel_config();    
+        
     while (1) {
         while (!connectedToPi) {
             // Busy wait here until the PI has connected to the Hexi!
             Thread::wait(50);
         }
-        while (!foundInitSequence) {
-            // Some code here to find initial sequence to start the action:
-
-            // After finding the initial sequence, we want to break out of the loop
-            foundInitSequence = true;
-
-            // We also want to send an alert to the Hexi (ONLY FOR THE WRIST ONE) that
-            // we have found the sequence
-        }
         
-        // wait for message for the Pi
+        oled.FillScreen(COLOR_BLACK);
+        strcpy((char *)text, "Flip Wrist");
+        oled.Label((uint8_t *)text, 22, 20);
+        
+        strcpy((char *)text, " To Start ");
+        oled.Label((uint8_t *)text, 22, 40);
+        
+        // wait for message from the Pi
         while (!startCollection) {
             Thread::wait(50);
         }
         startCollection = false;
         
+        Thread::wait(1000);
+        
+        // Tell user to begin
+        StartHaptic();
+        greenLed = LED_ON;
+        strcpy((char *)text, "Begin Shot");
+        oled.Label((uint8_t *)text, 22, 40);
+        // pc.printf("Begin collecting data\n");
+        
         collectRawData();
+        
+        // Indicate completion
+        StartHaptic();
+        greenLed = LED_OFF;
+        // pc.printf("Finished collecting data\n");
+        strcpy((char *)text, "Shot Done ");
+        oled.Label((uint8_t *)text, 22, 40);
+
+//        for (int i = 0; i < DATA_SIZE; i++) {
+//            pc.printf("%.3f, %.3f, %.3f,%.3f, %.3f, %.3f\n", 
+//            accelData[i][0], accelData[i][1],accelData[i][2], 
+//            gyroData[i][0], gyroData[i][1], gyroData[i][2]);
+//        }
+
         processRawData();
         sendProcessedData();
 
+        // pc.printf("Done sending data\n");
+        
+        strcpy((char *)text, " Data Sent ");
+        oled.Label((uint8_t *)text, 22, 40);
+        
         // Wait for two minutes before trying to go back into the init sequence
         // again in order for the ML on the python side to complete
-        Thread::wait(120000);
+//        Thread::wait(120000);
+        Thread::wait(5000);
         foundInitSequence = false;
     }
-
-    // txThread.start(txTask); /*Start transmitting Sensor Tag Data */
-
-    // while (true) {
-    //   // blueLed = !kw40z_device.GetAdvertisementMode(); /*Indicate BLE
-    //   // Advertisment Mode*/
-    //   Thread::wait(50);
-    // }
 }
 
 /******************************End of Main*************************************/
 
 /****************************** Data Processing Functions *******************/
 
+
 void updateValues()
-{
-    // stop arrays are full
-    if (data_index == DATA_SIZE) {
+{   
+    // stop if arrays are full
+    if (data_index >= DATA_SIZE) {
         doneCollecting = true;
         return;
     }
-    
+
     float dt = SYSTICK_PERIOD;
     float gyro_data[3];
     float accel_data[3];
@@ -299,7 +335,7 @@ void updateValues()
     x_theta += x_omega * dt;
     y_theta += y_omega * dt;
     z_theta += z_omega * dt;
-
+    
     // store acceleration data
     accelData[data_index][0] = x_accel;
     accelData[data_index][1] = y_accel;
@@ -351,16 +387,45 @@ void processRawData(void)
     // Also we want to do some pre-processing and cleaning up here??
 
     int16_t gyro1 = 0, gyro2 = 0, gyro3 = 0, accel1 = 0, accel2 = 0, accel3 = 0;
+    float gyro11 = 0, gyro22 = 0, gyro33 = 0, accel11 = 0, accel22 = 0, accel33 = 0;
+
     uint8_t gyro1sign = 0, gyro2sign = 0, gyro3sign = 0, accel1sign = 0, accel2sign = 0, accel3sign = 0;
 
-    for (int i = 0; i < 50; i++) {
-        gyro1 = gyroData[i * 10][0] * 100;
-        gyro2 = gyroData[i * 10][1] * 100;
-        gyro3 = gyroData[i * 10][2] * 100;
+    for (int i = 0; i < AVG_DATA_SIZE; i++) {
+        gyro11 = 0;
+        gyro22 = 0;
+        gyro33 = 0;
+        accel11 = 0;
+        accel22 = 0;
+        accel33 = 0;
+        
+        // take average of every 10 samples
+        for (int j = 0; j < 10; j++) {
+            int nextIndex = (i * 10) + j;
+            gyro11 += gyroData[nextIndex][0];
+            gyro22 += gyroData[nextIndex][1];
+            gyro33 += gyroData[nextIndex][2];
+    
+            accel11 += accelData[nextIndex][0];
+            accel22 += accelData[nextIndex][1];
+            accel33 += accelData[nextIndex][2];
+        }    
 
-        accel1 = accelData[i * 10][0] * 100;
-        accel2 = accelData[i * 10][1] * 100;
-        accel3 = accelData[i * 10][2] * 100;
+        gyro1 = gyro11 / 10 * 100;
+        gyro2 = gyro22 / 10 * 100;
+        gyro3 = gyro33 / 10 * 100;
+        accel1 = accel11 / 10 * 100;
+        accel2 = accel22 / 10 * 100;
+        accel3 = accel33 / 10 * 100;
+        
+//        gyro1 = gyroData[i*10][0] * 100;
+//        gyro2 = gyroData[i*10][1] * 100;
+//        gyro3 = gyroData[i*10][2] * 100;
+//
+//        accel1 = accelData[i*10][0] * 100;
+//        accel2 = accelData[i*10][1] * 100;
+//        accel3 = accelData[i*10][2] * 100;
+
 
         gyro1sign = gyro1 > 0 ? 0 : 1;
         gyro2sign = gyro2 > 0 ? 0 : 1;
@@ -401,14 +466,15 @@ void processRawData(void)
 // This sends the data over to the Raspberry Pi
 void sendProcessedData(void)
 {
-    uint8_t message[19];
-    for (int i = 0; i < 40; i++) {
+    uint8_t message[20];
+    for (int i = 0; i < AVG_DATA_SIZE; i++) {
         message[0] = 0;
         for (int j = 0; j < 9; j++) {
             message[1 + j] = processedGyroData[i][j];
             message[10 + j] = processedAccelData[i][j];
         }
-        kw40z_device.SendAlert(message, 19);
+        message[19] = i+1;
+        kw40z_device.SendAlert(message, 20);
         Thread::wait(50);
     }
 }
