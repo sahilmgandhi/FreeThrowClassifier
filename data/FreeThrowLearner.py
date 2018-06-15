@@ -8,7 +8,7 @@ import pickle
 dataArr = []
 indices = np.arange(0.01, 5.01, 0.1)
 for i in indices:
-    currFile = 'elbow{0:.2f}.csv'.format(i)
+    currFile = 'shoulder{0:.2f}.csv'.format(i)
     currData = np.genfromtxt(currFile, delimiter=',')
     dataArr.append(currData)
 
@@ -16,7 +16,7 @@ accuracyArr = []
 index = 0
 
 for data in dataArr:
-    train, test = train_test_split(data, test_size=0.3)
+    train, test = train_test_split(data, test_size=0.1)
     X_train = train[:, [0, 1, 2, 6, 7, 8]]
     X_test = test[:, [0, 1, 2, 6, 7, 8]]
     Y_train = train[:, -1:].ravel()
@@ -28,7 +28,7 @@ for data in dataArr:
     accuracy = logreg.score(X_test, Y_test)
     accuracyArr.append(accuracy)
 
-    fileName = 'elbow{0:.02f}.sav'.format(indices[index])
+    fileName = 'shoulder{0:.02f}_90.sav'.format(indices[index])
     pickle.dump(logreg, open(fileName, 'wb'))
     index += 1
 
