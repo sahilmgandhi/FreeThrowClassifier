@@ -201,23 +201,6 @@ int main()
     /* Get OLED Class Default Text Properties */
     oled_text_properties_t textProperties = {0};
     oled.GetTextProperties(&textProperties);
-
-    /* Change font color to Blue */
-    textProperties.fontColor = COLOR_BLUE;
-    oled.SetTextProperties(&textProperties);
-
-    /* Display Bluetooth Label at x=17,y=65 */
-    strcpy((char *)text, "BLUETOOTH");
-    oled.Label((uint8_t *)text, 17, 65);
-
-    /* Change font color to white */
-    textProperties.fontColor = COLOR_WHITE;
-    textProperties.alignParam = OLED_TEXT_ALIGN_CENTER;
-    oled.SetTextProperties(&textProperties);
-
-    /* Display Label at x=22,y=80 */
-    strcpy((char *)text, "Tap Below");
-    oled.Label((uint8_t *)text, 22, 80);
         
     gyro.gyro_config();
     accel.accel_config();    
@@ -253,7 +236,7 @@ int main()
         strcpy((char *)text, " To Start ");
         oled.Label((uint8_t *)text, 22, 40);
 
-        pc.printf("Waiting for init sequence\n");
+        // pc.printf("Waiting for init sequence\n");
         while (!foundInitSequence) {
             if (!connectedToPi) {
                 break;
@@ -288,7 +271,7 @@ int main()
             continue;
         }
         
-        pc.printf("Found init sequence\n");
+        // pc.printf("Found init sequence\n");
         
         oled.FillScreen(COLOR_BLACK);
         
@@ -302,21 +285,21 @@ int main()
         }
         startCollection = false;
         
-        Thread::wait(2000);
+        Thread::wait(1000);
         
         // Tell user to begin
         StartHaptic();
         greenLed = LED_ON;
         strcpy((char *)text, "Begin Shot");
         oled.Label((uint8_t *)text, 22, 40);
-        pc.printf("Begin collecting data\n");
+        // pc.printf("Begin collecting data\n");
         
         collectRawData();
         
         // Indicate completion
         StartHaptic();
         greenLed = LED_OFF;
-        pc.printf("Finished collecting data\n");
+        // pc.printf("Finished collecting data\n");
         strcpy((char *)text, "Shot Done ");
         oled.Label((uint8_t *)text, 22, 40);
 
@@ -329,7 +312,7 @@ int main()
         processRawData();
         sendProcessedData();
 
-        pc.printf("Done sending data\n");
+        // pc.printf("Done sending data\n");
         
         strcpy((char *)text, " Data Sent ");
         oled.Label((uint8_t *)text, 22, 40);
