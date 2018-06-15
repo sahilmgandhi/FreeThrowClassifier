@@ -6,6 +6,8 @@ import time
 import numpy as np
 from sklearn import linear_model
 import pickle
+import pandas as pd
+import matplotlib.pyplot as plt
 
 print("Done importing libraries.")
 
@@ -25,6 +27,19 @@ for i in indices:
     elbowModels.append(pickle.load(open(currElbowFile, 'rb')))
     shoulderModels.append(pickle.load(open(currShoulderFile, 'rb')))
 
+print("Getting good shot points for graphing")
+sheetMap = pd.read_excel('goodShots.xlsx')
+goodShots = sheetMap.as_matrix()
+xLabels = goodShots[:, 0]
+goodWristAngleX = goodShots[:, 1]
+goodWristAngleY = goodShots[:, 2]
+goodWristAngleZ = goodShots[:, 3]
+goodElbowAngleX = goodShots[:, 7]
+goodElbowAngleY = goodShots[:, 8]
+goodElbowAngleZ = goodShots[:, 9]
+goodShoulderAngleX = goodShots[:, 13]
+goodShoulderAngleY = goodShots[:, 14]
+goodSxhoulderAngleZ = goodShots[:, 15]
 
 # Global Variables
 elbowAccelerationX = []
@@ -422,19 +437,77 @@ while True:
         print("Elbow Accuracy: {}".format(np.average(elbowAccuracy)))
         print("Shoulder Accuracy: {}".format(np.average(shoulderAccuracy)))
 
-        # Weigh wrist more than elbow 
+        # Weigh wrist more than elbow
 
         wrist_weight = 0.7
         elbow_weight = 0.3
         shoulder_weight = 1.0
 
-        print("Total score with weights was {}".format(np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight))
+        print("Total score with weights was {}".format(np.average(wristAccuracy)*wrist_weight +
+                                                       np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight))
         if (np.average(wristAccuracy)*wrist_weight + np.average(elbowAccuracy)*elbow_weight + np.average(shoulderAccuracy)*shoulder_weight) > 0.5:
             print("It is a good shot")
         else:
             print("It is a bad shot")
 
+        print("Here is how your shot (top 3) compared to a good shot for angles")
+        plt.subplot(6, 1, 1)
+        plt.scatter(xLabels, wristAngleX)
+        plt.scatter(xLabels, wristAngleY)
+        plt.scatter(xLabels, wristAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Your Wrist Angles')
 
+        plt.subplot(6, 1, 2)
+        plt.scatter(xLabels, elbowAngleX)
+        plt.scatter(xLabels, elbowAngleY)
+        plt.scatter(xLabels, elbowAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Your Elbow Angles')
+
+        plt.subplot(6, 1, 3)
+        plt.scatter(xLabels, shoulderAngleX)
+        plt.scatter(xLabels, shoulderAngleY)
+        plt.scatter(xLabels, shoulderAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Your Shoulder Angles')
+
+        plt.subplot(6, 1, 4)
+        plt.scatter(xLabels, goodWristAngleX)
+        plt.scatter(xLabels, goodWristAngleY)
+        plt.scatter(xLabels, goodWristAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Good Wrist Angles')
+
+        plt.subplot(6, 1, 5)
+        plt.scatter(xLabels, goodElbowAngleX)
+        plt.scatter(xLabels, goodElbowAngleY)
+        plt.scatter(xLabels, goodElbowAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Good Elbow Angles')
+
+        plt.subplot(6, 1, 6)
+        plt.scatter(xLabels, goodShoulderAngleX)
+        plt.scatter(xLabels, goodShoulderAngleY)
+        plt.scatter(xLabels, goodShoulderAngleZ)
+        plt.xlabel("Time")
+        plt.ylabel("Degrees")
+        plt.legend(["X-Angle", "Y-Angle", "Z-Angle"])
+        plt.title('Good Shoulder Angles')
+
+        plt.show()
+
+        
         # Use some pre loaded machine learning model here to train and clasify the models!
         elbowAccelerationX = []
         elbowAccelerationY = []
