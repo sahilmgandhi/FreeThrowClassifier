@@ -39,7 +39,7 @@ goodElbowAngleY = goodShots[:, 8]
 goodElbowAngleZ = goodShots[:, 9]
 goodShoulderAngleX = goodShots[:, 13]
 goodShoulderAngleY = goodShots[:, 14]
-goodSxhoulderAngleZ = goodShots[:, 15]
+goodShoulderAngleZ = goodShots[:, 15]
 
 # Global Variables
 elbowAccelerationX = []
@@ -507,7 +507,6 @@ while True:
 
         plt.show()
 
-        
         # Use some pre loaded machine learning model here to train and clasify the models!
         elbowAccelerationX = []
         elbowAccelerationY = []
