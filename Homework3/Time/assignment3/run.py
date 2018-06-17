@@ -1,21 +1,5 @@
 #!/usr/bin/python
 
-import pip
-
-
-def import_or_install(package):
-    try:
-        __import__(package)
-    except ImportError:
-        pip.main(['install', package])
-
-
-import_or_install('bluepy')
-import_or_install('bluepy.btle')
-import_or_install('struct')
-import_or_install('time')
-import_or_install('datetime')
-
 import bluepy.btle
 from bluepy.btle import Scanner, DefaultDelegate, ScanEntry, Peripheral
 import struct
@@ -27,15 +11,14 @@ hexiOneAddress = str(f.readline().rstrip())
 print(hexiOneAddress)
 hexiTwoAddress = str(f.readline().rstrip())
 print(hexiTwoAddress)
-hexiThreeAddress = str(f.readline().rstrip())
-print(hexiThreeAddress)
+
 
 def try_send_until_success(func, hexi_num,  exception=bluepy.btle.BTLEException, msg='reattempting'):
     retry = True
     while True:
-	timeCommand = str(datetime.now().strftime('%H:%M:%S.%f')) + 'aaaaa'
-	#print(hexi_num + timeCommand)
-	args = [timeCommand, True]
+        timeCommand = str(datetime.now().strftime('%H:%M:%S.%f')) + 'aaaaa'
+        #print(hexi_num + timeCommand)
+        args = [timeCommand, True]
         try:
             func(*args)
             retry = False
@@ -44,6 +27,7 @@ def try_send_until_success(func, hexi_num,  exception=bluepy.btle.BTLEException,
 
         if not retry:
             break
+
 
 def try_add_until_success(func, exception=bluepy.btle.BTLEException, msg='reattempting', args=[]):
     retry = True
@@ -62,11 +46,11 @@ hexiTwo = Peripheral()
 
 print("Connecting to the first hexiwear")
 try_add_until_success(hexiOne.connect, msg='error connecting to 1',
-                  args=[hexiOneAddress])
+                      args=[hexiOneAddress])
 
 print("Connecting to the second hexiwear")
 try_add_until_success(hexiTwo.connect, msg='error connecting to 2',
-                  args=[hexiTwoAddress])
+                      args=[hexiTwoAddress])
 
 print("Done connecting")
 timeControl = hexiOne.getCharacteristics(uuid='2031')[0]  # Alert Input
@@ -79,8 +63,10 @@ count = 30
 
 while True:
     if count >= 30:
-        try_send_until_success(timeTwoControl.write, "Hexi Two: ", msg='Error sending the time to the second one')
-        try_send_until_success(timeControl.write, "Hexi One: ",msg='Error sending time to the first one')
+        try_send_until_success(timeTwoControl.write, "Hexi Two: ",
+                               msg='Error sending the time to the second one')
+        try_send_until_success(
+            timeControl.write, "Hexi One: ", msg='Error sending time to the first one')
         count = 0
     print(str(datetime.now().strftime('%H:%M:%S.%f')))
     time.sleep(1)

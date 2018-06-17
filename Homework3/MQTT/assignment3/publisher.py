@@ -1,7 +1,6 @@
 # The publisher must connect to the hexiwear and listen in for the button presses
 # When it gets the button press, depending on what it is, it should publish!
 
-import pip
 import paho.mqtt.client as mqtt
 import bluepy.btle
 from bluepy.btle import Scanner, DefaultDelegate, ScanEntry, Peripheral

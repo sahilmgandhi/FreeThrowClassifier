@@ -1,0 +1,15 @@
+#!/bin/bash
+
+echo "Installing relevant libraries (if needed)"
+
+echo "Installing bluepy"
+sudo pip install bluepy
+
+echo "Installing datetime"
+sudo pip install datetime
+
+# import_or_install('bluepy')
+# import_or_install('datetime')
+
+echo "Running time program with sudo access (Password might be required)"
+sudo python run.py
