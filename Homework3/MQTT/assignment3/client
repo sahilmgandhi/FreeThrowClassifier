@@ -1,0 +1,19 @@
+#!/bin/bash
+
+echo "Installing relevant libraries (if needed)"
+
+echo "Installing paho-mqtt"
+sudo pip install paho-mqtt
+
+echo "Installing time"
+sudo pip install time
+
+
+# import_or_install('bluepy')
+# import_or_install('bluepy.btle')
+# import_or_install('paho-mqtt')
+# import_or_install('struct')
+
+
+echo "Running client program with sudo access (Password might be required)"
+sudo python client.py

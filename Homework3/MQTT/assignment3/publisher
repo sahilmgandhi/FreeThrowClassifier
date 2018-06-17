@@ -1,0 +1,24 @@
+#!/bin/bash
+
+echo "Installing relevant libraries (if needed)"
+
+echo "Installing bluepy"
+sudo pip install bluepy
+
+echo "Installing bluepy.btle"
+sudo pip install bluepy.btle
+
+echo "Installing paho-mqtt"
+sudo pip install paho-mqtt
+
+echo "Installing struct"
+sudo pip install struct
+
+
+# import_or_install('bluepy')
+# import_or_install('bluepy.btle')
+# import_or_install('paho-mqtt')
+# import_or_install('struct')
+
+echo "Running publisher program with sudo access (Password might be required)"
+sudo python publisher.py
